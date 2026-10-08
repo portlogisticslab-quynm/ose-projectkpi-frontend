@@ -722,7 +722,7 @@ function Login({ login, setLogin, doLogin, backendStatus, backendHealth, probeBa
           <label className="label mt-4 block">Password</label>
           <input className="input mt-1" type="password" value={login.password} onChange={e=>setLogin({...login, password:e.target.value})} onKeyDown={e=>{ if(e.key === "Enter" && !loginBusy) doLogin(); }} />
           <button className="btn-primary mt-5 w-full" disabled={loginBusy} onClick={doLogin}>{loginBusy ? "Signing in..." : "Login"}</button>
-          <div className="mt-4 rounded-xl bg-slate-50 p-3 text-xs leading-5 text-slate-600">Bundled local demo: admin / admin123. For a PostgreSQL migration, use the existing V3.7 account password.</div>
+          <div className="mt-4 rounded-xl bg-slate-50 p-3 text-xs leading-5 text-slate-600">Phần mềm yêu cầu kết nối database với home server. Liên hệ với admin (quynm@portlogistics.vn) để được hướng dẫn truy cập.</div>
         </div>
       </div>
     </div>
