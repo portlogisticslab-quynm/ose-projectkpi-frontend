@@ -1,0 +1,19 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body { height: 100%; }
+body { background: #f4f8fc; color: #0b2239; }
+* { box-sizing: border-box; }
+
+@layer components {
+  .btn { @apply rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 shadow-sm hover:bg-slate-50 active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed; }
+  .btn-primary { @apply rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed; }
+  .btn-danger { @apply rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-100; }
+  .card { @apply rounded-2xl border border-slate-200 bg-white shadow-soft; }
+  .input { @apply w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100; }
+  .label { @apply text-xs font-bold uppercase tracking-wide text-slate-500; }
+  .pill { @apply inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700; }
+  .th { @apply sticky top-0 bg-slate-50 px-3 py-2 text-left text-xs font-bold uppercase tracking-wide text-slate-600; }
+  .td { @apply border-t border-slate-100 px-3 py-2 text-sm text-slate-700; }
+}

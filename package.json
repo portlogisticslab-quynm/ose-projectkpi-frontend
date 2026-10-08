@@ -1,0 +1,23 @@
+{
+  "name": "project-kpi-manager-v381",
+  "version": "3.8.1-b.1",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -H 127.0.0.1 -p 3000",
+    "build": "next build",
+    "start": "next start -H 127.0.0.1 -p 3000",
+    "build:pages": "NEXT_OUTPUT=export next build"
+  },
+  "dependencies": {
+    "@heroicons/react": "^2.1.5",
+    "next": "^14.2.5",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "recharts": "^2.12.7"
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.41",
+    "tailwindcss": "^3.4.10"
+  }
+}
