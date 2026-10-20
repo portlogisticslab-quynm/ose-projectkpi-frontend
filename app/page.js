@@ -17,6 +17,8 @@ const ROLE_TABS = {
   Employee: ["Dashboard", "Analytics", "Planning", "Tasks", "Workflow", "Collaboration", "Feedback", "Employees", "Projects", "KPI", "Project KPI", "Progress", "Quality", "Workload", "Risk", "Reports"],
   Viewer: ["Dashboard", "Analytics", "Planning", "Collaboration", "Feedback", "KPI", "Project KPI", "Progress", "Quality", "Workload", "Risk", "Reports"]
 };
+// OSE2 public view: visitors who are not logged in see these read-only tabs.
+const GUEST_TABS = ["Dashboard", "Analytics", "Planning", "KPI", "Project KPI", "Progress", "Quality", "Workload", "Risk", "Reports"];
 const WORKFLOW_ACTIONS = [
   ["assign_task", "Assign Task"],
   ["update_progress", "Update Progress"],
@@ -100,7 +102,23 @@ export default function Page() {
   const [loginError, setLoginError] = useState(null);
   const [loginBusy, setLoginBusy] = useState(false);
   const [notificationCount, setNotificationCount] = useState(0);
-  const allowedTabs = useMemo(() => ROLE_TABS[user?.Role] || [], [user]);
+  const isGuest = !!user?.IsGuest;
+  const [showLogin, setShowLogin] = useState(false);
+  const allowedTabs = useMemo(() => (user?.IsGuest ? GUEST_TABS : ROLE_TABS[user?.Role]) || [], [user]);
+
+  async function loadSessionUser() {
+    try {
+      const r = await fetch(`${API}/auth/me`, { credentials: "include", cache: "no-store" });
+      const js = r.ok ? await r.json() : null;
+      if (js?.user) {
+        setUser(js.user);
+        setActive(((js.user.IsGuest ? GUEST_TABS : ROLE_TABS[js.user.Role]) || ["Dashboard"])[0]);
+        return js.user;
+      }
+    } catch {}
+    setUser(null);
+    return null;
+  }
 
   async function probeBackend(silent = true) {
     try {
@@ -182,6 +200,7 @@ export default function Page() {
       }
       const js = await res.json();
       setUser(js.user);
+      setShowLogin(false);
       setLoginError(null);
       setMsg(`Logged in as ${js.user.FullName || js.user.Username}`);
       setActive((ROLE_TABS[js.user.Role] || ["Dashboard"])[0]);
@@ -206,6 +225,8 @@ export default function Page() {
     setMsg("");
     setDashboard(emptyDashboard());
     setActive("Dashboard");
+    setShowLogin(false);
+    await loadSessionUser();
   }
 
   async function changeOwnPassword() {
@@ -511,7 +532,7 @@ export default function Page() {
   }
 
   async function loadNotificationCount() {
-    if (!user) return 0;
+    if (!user || user.IsGuest) return 0;
     try {
       const r = await api("/collaboration/notifications?unread_only=true&limit=500");
       const n = Number(r.count || 0);
@@ -524,15 +545,7 @@ export default function Page() {
 
   useEffect(() => {
     probeBackend(true);
-    fetch(`${API}/auth/me`, { credentials: "include", cache: "no-store" })
-      .then(r => r.ok ? r.json() : null)
-      .then(js => {
-        if (js?.user) {
-          setUser(js.user);
-          setActive((ROLE_TABS[js.user.Role] || ["Dashboard"])[0]);
-        }
-      })
-      .catch(() => {});
+    loadSessionUser();
     const timer = setInterval(() => probeBackend(true), 15000);
     return () => clearInterval(timer);
   }, []);
@@ -540,11 +553,12 @@ export default function Page() {
   useEffect(() => {
     if (!user) return;
     refreshAll();
+    if (user.IsGuest) return;
     loadNotificationCount();
     const notificationTimer = setInterval(() => loadNotificationCount(), 30000);
     return () => clearInterval(notificationTimer);
   }, [user]);
-  useEffect(() => { if (workflow.task_id && user) loadHistory(workflow.task_id); }, [workflow.task_id]);
+  useEffect(() => { if (workflow.task_id && user && !user.IsGuest) loadHistory(workflow.task_id); }, [workflow.task_id]);
   useEffect(() => {
     if (user && active === "Settings") {
       loadSettings().catch(() => {});
@@ -562,7 +576,7 @@ export default function Page() {
     (filters.status === "All" || t.DeadlineStatus === filters.status || t.Status === filters.status)
   );
 
-  if (!user) return <Login login={login} setLogin={setLogin} doLogin={doLogin} backendStatus={backendStatus} backendHealth={backendHealth} probeBackend={probeBackend} loginError={loginError} loginBusy={loginBusy} />;
+  if (!user || (isGuest && showLogin)) return <Login login={login} setLogin={setLogin} doLogin={doLogin} backendStatus={backendStatus} backendHealth={backendHealth} probeBackend={probeBackend} loginError={loginError} loginBusy={loginBusy} onBack={isGuest ? () => { setShowLogin(false); setLoginError(null); } : null} />;
 
   return (
     <div className="min-h-screen bg-slate-100">
@@ -581,7 +595,9 @@ export default function Page() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h1 className="text-xl font-black text-slate-900">Project KPI Manager V3.8.1b</h1>
-              <div className="text-xs text-slate-500">User: <b>{user.FullName || user.Username}</b> · Access: <b>{user.AccessRole || user.Role}</b> · Scope: <b>{user.ProjectScope || "-"}</b></div>
+              {isGuest
+                ? <div className="text-xs text-slate-500">Chế độ xem: <b>Khách (chỉ xem)</b> · Không cần đăng nhập · Không chỉnh sửa được dữ liệu</div>
+                : <div className="text-xs text-slate-500">User: <b>{user.FullName || user.Username}</b> · Access: <b>{user.AccessRole || user.Role}</b> · Scope: <b>{user.ProjectScope || "-"}</b></div>}
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <span className={classNames(
@@ -602,17 +618,22 @@ export default function Page() {
               {user.Role === "Admin" && <button className="btn" onClick={initDb}>Initialize DB</button>}
               {user.Role === "Admin" && <button className="btn" onClick={importDemo}>Import Demo Excel</button>}
               {user.Role === "Admin" && <label className="btn cursor-pointer">Upload Excel<input className="hidden" type="file" accept=".xlsx,.xlsm" onChange={uploadExcel} /></label>}
-              {!["Employee"].includes(user.Role) && <button className="btn-primary" onClick={calculate}>Calculate KPI</button>}
+              {!isGuest && !["Employee"].includes(user.Role) && <button className="btn-primary" onClick={calculate}>Calculate KPI</button>}
               <button className="btn" onClick={openExcelReport}>Export Excel</button>
               {user.Role === "Admin" && <button className="btn" onClick={backupDb}>Backup DB</button>}
               {user.Role === "Admin" && <button className="btn-danger" onClick={clearDb}>Clear DB</button>}
               {allowedTabs.includes("Collaboration") && <button className="btn" onClick={() => setActive("Collaboration")}>
                 Notifications {notificationCount > 0 ? `(${notificationCount})` : ""}
               </button>}
-              <button className="btn" onClick={changeOwnPassword}>Change Password</button>
-              <button className="btn" onClick={logout}>Logout</button>
+              {isGuest
+                ? <button className="btn-primary" onClick={() => setShowLogin(true)}>Đăng nhập để chỉnh sửa</button>
+                : <>
+                    <button className="btn" onClick={changeOwnPassword}>Change Password</button>
+                    <button className="btn" onClick={logout}>Logout</button>
+                  </>}
             </div>
           </div>
+          {isGuest && <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">Bạn đang xem ở chế độ khách: chỉ xem, không chỉnh sửa được. Muốn cập nhật dữ liệu, bấm “Đăng nhập để chỉnh sửa”.</div>}
           {msg && <div className="mt-2 rounded-xl bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700">{msg}</div>}
         </header>
         <div className="flex gap-2 overflow-x-auto border-b border-slate-200 bg-white px-4 py-2 lg:hidden">
@@ -668,7 +689,7 @@ export default function Page() {
   );
 }
 
-function Login({ login, setLogin, doLogin, backendStatus, backendHealth, probeBackend, loginError, loginBusy }) {
+function Login({ login, setLogin, doLogin, backendStatus, backendHealth, probeBackend, loginError, loginBusy, onBack }) {
   const online = backendStatus === "online";
   const offline = backendStatus === "offline";
 
@@ -722,6 +743,7 @@ function Login({ login, setLogin, doLogin, backendStatus, backendHealth, probeBa
           <label className="label mt-4 block">Password</label>
           <input className="input mt-1" type="password" value={login.password} onChange={e=>setLogin({...login, password:e.target.value})} onKeyDown={e=>{ if(e.key === "Enter" && !loginBusy) doLogin(); }} />
           <button className="btn-primary mt-5 w-full" disabled={loginBusy} onClick={doLogin}>{loginBusy ? "Signing in..." : "Login"}</button>
+          {onBack && <button className="btn mt-3 w-full" onClick={onBack}>← Quay lại xem (không cần đăng nhập)</button>}
           <div className="mt-4 rounded-xl bg-slate-50 p-3 text-xs leading-5 text-slate-600">Phần mềm yêu cầu kết nối database với home server. Liên hệ với admin (quynm@portlogistics.vn) để được hướng dẫn truy cập.</div>
         </div>
       </div>
